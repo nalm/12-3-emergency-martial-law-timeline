@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>12.3 비상계엄 사건 인터랙티브 타임라인</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', system-ui, sans-serif;
+    background: #f8fafc; color: #0f172a;
+  }
+  .app { display: flex; flex-direction: column; height: 100vh; }
+
+  /* ===== Header ===== */
+  header.top {
+    padding: 14px 20px 10px;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    color: #f1f5f9;
+    border-bottom: 1px solid #334155;
+  }
+  header.top h1 {
+    margin: 0 0 6px; font-size: 18px; font-weight: 700; letter-spacing: -0.3px;
+  }
+  header.top .sub { font-size: 12px; color: #94a3b8; }
+
+  /* ===== Controls ===== */
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    padding: 10px 16px; background: #ffffff; border-bottom: 1px solid #e2e8f0;
+    position: sticky; top: 0; z-index: 30;
+  }
+  .controls .group {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .controls label { font-size: 12px; color: #475569; font-weight: 600; }
+  .controls input[type=search] {
+    padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px;
+    font-size: 13px; width: 220px; outline: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .controls input[type=search]:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+  .chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 10px; font-size: 12px; font-weight: 600;
+    border: 1.5px solid; border-radius: 14px; cursor: pointer; user-select: none;
+    background: #fff; transition: all .12s;
+  }
+  .chip:hover { transform: translateY(-1px); }
+  .chip.active { color: #fff; }
+  .chip .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .phase-jump { display: flex; gap: 6px; }
+  .phase-jump button {
+    border: 1px solid #cbd5e1; background: #fff;
+    font-size: 11px; padding: 4px 8px; border-radius: 4px;
+    cursor: pointer; color: #334155; font-weight: 600;
+  }
+  .phase-jump button:hover { background: #f1f5f9; }
+  .reset-btn {
+    border: 1px solid #cbd5e1; background: #fff;
+    padding: 5px 10px; border-radius: 6px; font-size: 12px;
+    cursor: pointer; color: #475569; font-weight: 600;
+  }
+  .reset-btn:hover { background: #f1f5f9; }
+  .stats { font-size: 12px; color: #64748b; margin-left: auto; }
+  .stats b { color: #0f172a; font-size: 13px; }
+
+  /* ===== Person filter row ===== */
+  .person-row {
+    display: flex; flex-wrap: wrap; gap: 5px;
+    padding: 8px 16px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0;
+  }
+
+  /* ===== Table ===== */
+  .table-wrap {
+    flex: 1; overflow: auto; position: relative;
+    background: #fff;
+  }
+  table.tl {
+    border-collapse: separate; border-spacing: 0;
+    font-size: 12px; min-width: 100%;
+  }
+  table.tl thead th {
+    position: sticky; top: 0; z-index: 20;
+    background: #0f172a; color: #f1f5f9;
+    padding: 8px 6px; min-width: 180px; max-width: 200px;
+    border-right: 1px solid #1e293b; border-bottom: 2px solid #334155;
+    text-align: center; vertical-align: middle;
+    font-weight: 600; white-space: normal;
+  }
+  table.tl thead th .role {
+    display: block; font-size: 10px; color: #94a3b8; font-weight: 500; margin-top: 2px;
+  }
+  table.tl thead th.time-col {
+    left: 0; z-index: 22; min-width: 150px; max-width: 160px;
+    background: #020617;
+  }
+  table.tl tbody td.time-cell {
+    position: sticky; left: 0; z-index: 10;
+    font-weight: 700; font-size: 11.5px; text-align: center;
+    padding: 8px 6px; vertical-align: middle;
+    border-right: 2px solid #334155;
+    background: #1e293b; color: #f1f5f9;
+    min-width: 150px; max-width: 160px;
+  }
+  table.tl tbody td {
+    padding: 8px 8px; vertical-align: top;
+    border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;
+    line-height: 1.45; min-width: 180px; max-width: 200px;
+    background: #fff;
+    transition: background .12s;
+  }
+  table.tl tbody td.has-action {
+    border-left: 3px solid transparent;
+  }
+  table.tl tbody tr:hover td { background: #fafafa; }
+  table.tl tbody tr:hover td.time-cell { background: #334155; }
+  table.tl tbody tr.phase-pre td.time-cell { background: #92400e; }
+  table.tl tbody tr.phase-imminent td.time-cell { background: #c2410c; }
+  table.tl tbody tr.phase-dday td.time-cell { background: #b91c1c; }
+  table.tl tbody tr.phase-release td.time-cell { background: #15803d; }
+  table.tl tbody tr.phase-after td.time-cell { background: #1d4ed8; }
+
+  table.tl tbody td.has-action.dim { opacity: 0.18; }
+  table.tl tbody td.has-action.highlight { background: #fef9c3 !important; }
+
+  mark.q {
+    background: #fde047; padding: 0 2px; border-radius: 2px; color: #422006; font-weight: 600;
+  }
+
+  .star {
+    display: inline-block; background: #dc2626; color: #fff;
+    font-size: 10px; padding: 1px 5px; border-radius: 3px; margin-right: 4px;
+    font-weight: 700; letter-spacing: 0.5px;
+  }
+
+  .row-hidden { display: none; }
+  .col-hidden { display: none; }
+
+  .empty-state {
+    padding: 60px 20px; text-align: center; color: #94a3b8; font-size: 13px;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 12px;
+    padding: 6px 16px; background: #f8fafc; border-top: 1px solid #e2e8f0;
+    font-size: 11px; color: #64748b;
+  }
+  .legend span.lg { display: inline-flex; align-items: center; gap: 4px; }
+  .legend span.lg b { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+
+  @media (max-width: 768px) {
+    .controls input[type=search] { width: 140px; }
+    table.tl thead th, table.tl tbody td { min-width: 140px; max-width: 160px; font-size: 11px; }
+    table.tl thead th.time-col, table.tl tbody td.time-cell { min-width: 120px; max-width: 130px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="top">
+    <h1>12.3 비상계엄 사건 — 인터랙티브 타임라인</h1>
+    <div class="sub">행: 시간순 / 열: 인물별 · 인물·단계 필터, 키워드 검색, 단계 점프 지원 · 셀 클릭 시 같은 행위자만 강조</div>
+  </header>
+
+  <div class="controls">
+    <div class="group">
+      <label>검색</label>
+      <input type="search" id="searchBox" placeholder="키워드 (예: 헬기, 국회, 포고령)">
+    </div>
+    <div class="group" id="phaseChips"></div>
+    <div class="group phase-jump" id="phaseJump"></div>
+    <button class="reset-btn" id="resetBtn">초기화</button>
+    <div class="stats" id="stats"></div>
+  </div>
+
+  <div class="person-row" id="personRow"></div>
+
+  <div class="table-wrap">
+    <table class="tl" id="tl">
+      <thead><tr id="theadRow"></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="empty-state" id="emptyState" style="display:none;">표시할 행이 없습니다. 필터를 조정해 보세요.</div>
+  </div>
+
+  <div class="legend">
+    <span class="lg"><b style="background:#dc2626;"></b> 핵심 사건은 ★ 표시</span>
+    <span class="lg">단계별 색상: <b style="background:#92400e;"></b>사전 <b style="background:#c2410c;"></b>임박 <b style="background:#b91c1c;"></b>선포일 <b style="background:#15803d;"></b>해제일 <b style="background:#1d4ed8;"></b>사후</span>
+    <span class="lg">셀 클릭 → 해당 인물만 강조 · 같은 인물 헤더 클릭 → 토글 필터</span>
+  </div>
+</div>
+
+<script>
+const DATA = {"persons": [{"key": "윤석열", "label": "윤석열", "role": "대통령", "color": "#dc2626"}, {"key": "김용현", "label": "김용현", "role": "국방장관", "color": "#ea580c"}, {"key": "노상원", "label": "노상원", "role": "전 정보사령관", "color": "#d97706"}, {"key": "여인형", "label": "여인형", "role": "방첩사령관", "color": "#ca8a04"}, {"key": "곽종근", "label": "곽종근", "role": "특전사령관", "color": "#65a30d"}, {"key": "이진우", "label": "이진우", "role": "수방사령관", "color": "#16a34a"}, {"key": "문상호", "label": "문상호", "role": "정보사령관", "color": "#0d9488"}, {"key": "박안수", "label": "박안수", "role": "육참총장/계엄사령관", "color": "#0891b2"}, {"key": "조지호", "label": "조지호", "role": "경찰청장", "color": "#0284c7"}, {"key": "김봉식", "label": "김봉식", "role": "서울경찰청장", "color": "#2563eb"}, {"key": "한덕수", "label": "한덕수", "role": "국무총리", "color": "#4f46e5"}, {"key": "이상민", "label": "이상민", "role": "행안부장관", "color": "#7c3aed"}, {"key": "강의구", "label": "강의구", "role": "대통령실 부속실장", "color": "#9333ea"}, {"key": "기타", "label": "기타/사건", "role": "부대·기관·사건", "color": "#64748b"}], "rows": [{"time": "2024.3월말~4월초", "phase": "pre", "actions": {"윤석열": "신원식·조태용·여인형·김용현 등과 식사 중 '비상대권', '군이 나서야 되지 않느냐'며 비상계엄 필요성 최초 언급", "김용현": "윤석열의 비상계엄 언급 자리 동석", "여인형": "윤석열의 비상계엄 언급 자리 동석"}}, {"time": "2024.4월 중순", "phase": "pre", "actions": {"김용현": "한남동 경호처장 공관에서 여인형·곽종근·이진우와 저녁 식사 (협력체계 강화)", "여인형": "김용현 주재 식사 참석", "곽종근": "김용현 주재 식사 참석", "이진우": "김용현 주재 식사 참석"}}, {"time": "2024.5~6월", "phase": "pre", "actions": {"윤석열": "삼청동 안가에서 김용현·여인형 등과 식사하며 비상대권 행사 지속 언급", "김용현": "삼청동 안가 식사 참석", "여인형": "삼청동 안가 식사 참석 / 별도로 곽종근·이진우와 강남 식당 식사", "곽종근": "여인형·이진우와 강남 식당 식사", "이진우": "여인형·곽종근과 강남 식당 식사"}}, {"time": "2024.6.17경", "phase": "pre", "actions": {"윤석열": "삼청동 안가에서 김용현·여인형·곽종근·이진우·정진팔과 저녁 식사", "김용현": "삼청동 안가 저녁 식사 참석", "여인형": "삼청동 안가 저녁 식사 참석", "곽종근": "삼청동 안가 저녁 식사 참석", "이진우": "삼청동 안가 저녁 식사 참석"}}, {"time": "2024.8월 초순 저녁", "phase": "pre", "actions": {"윤석열": "대통령 관저에서 여인형으로부터 '정보사 간첩 혐의' 보고 받고 민주노총 등 대책 마련 지시", "여인형": "윤석열에게 정보사 간첩 혐의 사건 보고"}}, {"time": "2024.8.12", "phase": "pre", "actions": {"김용현": "국방부장관 후보자로 지명"}}, {"time": "2024.8.26", "phase": "pre", "actions": {"기타": "대통령실 대변인, 야당의 계엄령 준비설을 '근거 없는 괴담'으로 일축"}}, {"time": "2024.9.2", "phase": "pre", "actions": {"김용현": "국회 인사청문회에서 계엄 가능성 부인"}}, {"time": "2024.9.6", "phase": "pre", "actions": {"김용현": "제50대 국방부장관 취임. 오영대 인사기획관에 문상호 정보사령관 유임 지시", "문상호": "김용현 지시로 정보사령관 유임"}}, {"time": "2024.9.9경", "phase": "pre", "actions": {"노상원": "정보사 김봉규 대령에게 특수요원 7~8명 추천 지시"}}, {"time": "2024.10.1 20:00", "phase": "pre", "actions": {"윤석열": "국군의 날 시가행진 후 관저에서 김용현·여인형·곽종근·이진우와 식사하며 비상대권 행사 필요성 강조", "김용현": "윤석열 주재 관저 식사 참석", "여인형": "윤석열 주재 관저 식사 참석", "곽종근": "윤석열 주재 관저 식사 참석", "이진우": "윤석열 주재 관저 식사 참석"}}, {"time": "2024.10.14경", "phase": "pre", "actions": {"김용현": "문상호에게 '노상원 장군 하는 일을 잘 도와주어라' 지시", "노상원": "김용현 지시로 문상호의 협조 확보", "문상호": "김용현으로부터 노상원 협조 지시 수령"}}, {"time": "2024.10.중순", "phase": "pre", "actions": {"문상호": "김봉규·정성욱에게 임무 수행 요원 15~20명씩 선발 지시"}}, {"time": "2024.10.27", "phase": "pre", "actions": {"여인형": "휴대전화에 '포고령 위반, 최우선 검거 및 압수수색' 메모 작성"}}, {"time": "2024.10.29경", "phase": "pre", "actions": {"노상원": "문상호 통해 요원 선발 재차 지시", "문상호": "김봉규·정성욱에게 노상원이 지시한 요원 선발 재지시"}}, {"time": "2024.10월말", "phase": "pre", "actions": {"노상원": "김봉규에게 특수부대 요원 5명 및 우회 공작 인원 15명 선발 지시 (전라도 출신 배제)"}}, {"time": "2024.11.4", "phase": "pre", "actions": {"기타": "더불어민주당, 계엄선포 시 국회 사전 동의를 요하는 계엄법 개정안 당론 채택"}}, {"time": "2024.11.5~6", "phase": "pre", "actions": {"여인형": "'적 행동이 먼저임', '최초부터 군경합동이 필수' 등 메모 작성", "기타": "김용군이 수사단 요원 25명 명단을 노상원에게 전송(11.6)"}}, {"time": "2024.11.9 오후", "phase": "pre", "actions": {"김용현": "여인형에게 비상계엄 시 체포 대상 거론", "여인형": "김용현 말 듣고 이재명·조국·한동훈 등 체포 대상 명단 메모"}}, {"time": "2024.11.9", "phase": "pre", "actions": {"노상원": "안산 카페에서 문상호·김봉규 만나 계엄 임박 통보 및 선관위 진입 관련 문건 교부", "문상호": "노상원으로부터 선관위 진입 문건 수령"}}, {"time": "2024.11.9 저녁", "phase": "pre", "actions": {"윤석열": "국방부장관 공관에서 김용현·여인형·곽종근·이진우와 식사하며 비상계엄 동조·모의 구체화", "김용현": "장관 공관 식사 주재", "여인형": "장관 공관 식사 참석", "곽종근": "장관 공관 식사 참석", "이진우": "장관 공관 식사 참석"}}, {"time": "2024.11.10 01:15/01:19/18:40", "phase": "pre", "actions": {"이진우": "휴대전화로 '한동훈 당게시판 조작' 등 검색"}}, {"time": "2024.11.10", "phase": "pre", "actions": {"노상원": "안산에서 김용군으로부터 25명 군사경찰 명단 서류 전달받음"}}, {"time": "2024.11.11경", "phase": "pre", "actions": {"김용현": "곽종근에게 전화. 곽종근이 명분 없다고 난색을 표하자 수당 인상 등 회유 언급", "곽종근": "김용현 전화에 '명분 없다'며 난색"}}, {"time": "2024.11.15 15:53", "phase": "pre", "actions": {"여인형": "'군사적 태세, 공세적 조치 + 자위권적 응징태세' 메모 작성"}}, {"time": "2024.11.17 점심", "phase": "pre", "actions": {"김용현": "노상원과 조우", "노상원": "김용현과 점심 조우"}}, {"time": "2024.11.17 15:00", "phase": "pre", "actions": {"노상원": "안산 롯데리아에서 문상호·정성욱에게 야구방망이·케이블타이·복면 등 준비 지시", "문상호": "노상원으로부터 폭력 도구 준비 지시 수령"}}, {"time": "2024.11.19경", "phase": "pre", "actions": {"노상원": "문상호로부터 요원 40명 명단 전달받음", "문상호": "정보사 요원 40명 명단을 노상원에게 전달"}}, {"time": "2024.11.24경", "phase": "pre", "actions": {"윤석열": "대통령 관저에서 김용현과 비상계엄 논의", "김용현": "관저에서 윤석열과 비상계엄 논의", "노상원": "문상호 해외출장 일정 질책 및 취소 지시", "문상호": "노상원으로부터 해외출장 취소 지시 받음"}}, {"time": "2024.11.24~12.1", "phase": "pre", "actions": {"김용현": "과거 계엄령 문건 참고하여 계엄 선포문·대국민 담화문·포고령 초안 작성"}}, {"time": "2024.11.28", "phase": "pre", "actions": {"기타": "국회, 감사원장 및 검사 탄핵소추안 본회의 부의"}}, {"time": "2024.11.29 20:00", "phase": "pre", "actions": {"김용현": "오영대에게 정용길 준장의 정보사 부임 일자 연기 지시"}}, {"time": "2024.11.30 11:53~14:51", "phase": "pre", "actions": {"김용현": "국방부장관 공관에서 노상원 만남", "노상원": "장관 공관에서 김용현과 계엄 논의"}}, {"time": "2024.11.30 18:00", "phase": "pre", "actions": {"김용현": "여인형 만나 윤석열의 비상계엄 실행 결정 전파", "여인형": "김용현으로부터 비상계엄 실행 결정 전달 받음"}}, {"time": "2024.11.30 18:00~23:00", "phase": "pre", "actions": {"윤석열": "대통령 관저에서 김용현·여인형과 5시간 비상계엄 실행 논의", "김용현": "관저에서 윤석열과 5시간 논의", "여인형": "관저에서 윤석열과 5시간 논의"}}, {"time": "2024.12.1 오전", "phase": "imminent", "actions": {"여인형": "정성우에게 '12.2부터 부대 대기' 지시"}}, {"time": "2024.12.1 09:15~11:24", "phase": "imminent", "actions": {"김용현": "장관 공관에서 노상원과 계엄 논의", "노상원": "장관 공관에서 김용현과 계엄 논의"}}, {"time": "2024.12.1 12:18~12:58", "phase": "imminent", "actions": {"노상원": "안산 롯데리아에서 문상호 등 만나 이행상황 점검", "문상호": "노상원에게 이행상황 보고"}}, {"time": "2024.12.1 12:50", "phase": "imminent", "actions": {"김용현": "박안수에게 12.3 16:00 보고 지시", "박안수": "김용현으로부터 12.3 보고 지시 수령"}}, {"time": "2024.12.1 14:21/14:29", "phase": "imminent", "actions": {"김용현": "이진우와 통화하며 수방사 출동 태세 질문", "이진우": "김용현 통화로 수방사 출동 태세 질문 받음"}}, {"time": "2024.12.1 14:47/15:00", "phase": "imminent", "actions": {"김용현": "여인형과 통화", "여인형": "김용현과 통화"}}, {"time": "2024.12.1 15:15", "phase": "imminent", "actions": {"여인형": "이진우와 통화", "곽종근": "이진우와 통화", "이진우": "여인형 및 곽종근과 순차 통화"}}, {"time": "2024.12.1 오후", "phase": "imminent", "actions": {"김용현": "곽종근에게 국회·선관위 등 시설 확보 지시", "곽종근": "김용현으로부터 국회·선관위 시설 확보 지시 수령"}}, {"time": "2024.12.1 15:44~16:24", "phase": "imminent", "actions": {"여인형": "'반국가세력 수사본부, 30명 위치파악…' 등 메모 작성"}}, {"time": "2024.12.1 16:53/17:06", "phase": "imminent", "actions": {"김용현": "곽종근과 통화", "곽종근": "김용현과 통화"}}, {"time": "2024.12.1 17:10", "phase": "imminent", "actions": {"곽종근": "예하 제1공수에 야외 훈련 중단 및 영내 훈련 지시"}}, {"time": "2024.12.2 오전", "phase": "imminent", "actions": {"김용현": "이진우로부터 수방사 출동 임무 보고 수령", "이진우": "휴대폰 보관·위병소 폐쇄 등 수방사 출동 임무를 정리해 김용현에게 보고"}}, {"time": "2024.12.2 10:00~17:00", "phase": "imminent", "actions": {"곽종근": "예하 지휘관들에게 출동 준비태세 하달 및 영내 대기 지시"}}, {"time": "2024.12.2 저녁", "phase": "imminent", "actions": {"윤석열": "야간 통행금지 삭제 등 보완 지시 후 김용현의 선포문 등 승인 / 곽종근과 통화", "김용현": "수정 보고한 선포문 윤석열 승인 받음 / 곽종근과 통화", "곽종근": "윤석열·김용현과 통화"}}, {"time": "2024.12.2 저녁~자정", "phase": "imminent", "actions": {"김용현": "노상원과 4시간 논의", "노상원": "김용현과 4시간 논의"}}, {"time": "2024.12.3 06:59~09:35", "phase": "dday", "actions": {"김용현": "장관 공관에서 노상원 면담", "노상원": "장관 공관에서 김용현 면담"}}, {"time": "2024.12.3 08:00", "phase": "dday", "actions": {"곽종근": "참모진에게 대비태세 유지 철저 지시"}}, {"time": "2024.12.3 10:00", "phase": "dday", "actions": {"문상호": "1개 팀(고동희 등) 선관위 투입 대기 지시"}}, {"time": "2024.12.3 10:30~20:06", "phase": "dday", "actions": {"윤석열": "한덕수·박성재·이상민·김영호·조태열·조태용 6명 사전 개별 소집", "김용현": "윤석열의 사전 개별 소집 동행", "한덕수": "윤석열에게 사전 개별 소집됨", "이상민": "윤석열에게 사전 개별 소집됨"}}, {"time": "2024.12.3 10:55~11:26", "phase": "dday", "actions": {"곽종근": "김세운에게 헬기 12대 준비 지시"}}, {"time": "2024.12.3 11:25~13:33", "phase": "dday", "actions": {"여인형": "합수본 편성 관련 내용 휴대전화 메모"}}, {"time": "2024.12.3 12:20~18:00", "phase": "dday", "actions": {"기타": "707특수임무단, 테러진압훈련 등 계획 수립"}}, {"time": "2024.12.3 점심", "phase": "dday", "actions": {"김용현": "방정환에게 대기 명령"}}, {"time": "2024.12.3 14:49~16:03", "phase": "dday", "actions": {"노상원": "안산 롯데리아에서 김용군 등 만나 '오늘이 계엄이다' 전파"}}, {"time": "2024.12.3 16:00", "phase": "dday", "actions": {"김용현": "박안수의 현안 보고 수령, 21:40 장관 대기실로 올 것 지시", "박안수": "김용현에게 현안 보고 후 21:40 대기 지시 수령"}}, {"time": "2024.12.3 16:30", "phase": "dday", "actions": {"문상호": "정성욱에게 저녁 8시까지 요원 36명 소집 지시"}}, {"time": "2024.12.3 18:00~18:40", "phase": "dday", "actions": {"곽종근": "전투복 입고 참모 등과 식사하며 엄중 상황 강조"}}, {"time": "2024.12.3 18:18~18:21", "phase": "dday", "actions": {"윤석열": "조지호·김봉식을 안가로 호출", "조지호": "윤석열로부터 안가 호출", "김봉식": "윤석열로부터 안가 호출"}}, {"time": "2024.12.3 18:43~18:56", "phase": "dday", "actions": {"곽종근": "김정근에게 여단 전 인원 비상소집·영내대기 지시"}}, {"time": "2024.12.3 18:52~19:06", "phase": "dday", "actions": {"기타": "제3공수특전여단 비상소집 실시"}}, {"time": "2024.12.3 19:20", "phase": "dday", "actions": {"윤석열": "삼청동 안가에서 조지호·김봉식 만나 '2200 국회 등 봉쇄' 문건 전달", "김용현": "윤석열과 함께 조지호·김봉식에게 문건 전달", "조지호": "윤석열로부터 '2200 국회 봉쇄' 문건 수령", "김봉식": "윤석열로부터 '2200 국회 봉쇄' 문건 수령"}}, {"time": "2024.12.3 19:26", "phase": "dday", "actions": {"곽종근": "김세운에게 헬기 12대 출동 준비 재강조"}}, {"time": "2024.12.3 19:30~20:53", "phase": "dday", "actions": {"기타": "707특수임무단 비상소집 및 출동준비 완료"}}, {"time": "2024.12.3 19:45~20:07", "phase": "dday", "actions": {"김봉식": "최창복에게 비상계엄 동원 기동대 현황 보고 지시"}}, {"time": "2024.12.3 20:00", "phase": "dday", "actions": {"윤석열": "홍장원(국정원 1차장)에게 전화하여 대기 지시"}}, {"time": "2024.12.3 20:20~22:00", "phase": "dday", "actions": {"윤석열": "국무총리·외교부장관 등의 비상계엄 선포 만류를 받음", "한덕수": "윤석열에게 비상계엄 선포 만류"}}, {"time": "2024.12.3 21:14~21:54", "phase": "dday", "actions": {"윤석열": "의사정족수 맞추고자 최상목 등 국무위원 6명 추가 소집 지시"}}, {"time": "2024.12.3 21:16", "phase": "dday", "actions": {"김봉식": "기동대 1개 제대를 국회 주변으로 조용히 이동 지시"}}, {"time": "2024.12.3 21:22:38~21:22:47", "phase": "dday", "actions": {"이상민": "(CCTV) 대접견실에서 손을 펴고 바깥으로 밀어내는 동작"}}, {"time": "2024.12.3 21:30", "phase": "dday", "actions": {"문상호": "100여단 회의실에서 요원 36명에게 비상계엄 선포 임박 사실 전파"}}, {"time": "2024.12.3 21:34:26~21:34:29", "phase": "dday", "actions": {"김용현": "(CCTV) 대접견실 진입", "기타": "(CCTV) 김영호가 김용현 가리키며 대화"}}, {"time": "2024.12.3 21:35:52~21:36:13", "phase": "dday", "actions": {"김용현": "(CCTV) 한덕수에게 손가락 4개 펴 보이는 이상민 보며 고개 끄덕임", "한덕수": "(CCTV) 이상민이 손가락 4개 펴 보임 받음", "이상민": "(CCTV) 한덕수에게 손가락 4개 펴 보임"}}, {"time": "2024.12.3 21:37:35~21:37:36", "phase": "dday", "actions": {"한덕수": "(CCTV) 휴대전화로 누군가에게 전화"}}, {"time": "2024.12.3 21:40~21:50", "phase": "dday", "actions": {"문상호": "고동희 등 선발대 10명에게 중앙선관위 전산실 직원 명단 사진 전송"}}, {"time": "2024.12.3 21:41~21:42", "phase": "dday", "actions": {"곽종근": "특전사 전투통제실로 진입"}}, {"time": "2024.12.3 21:48", "phase": "dday", "actions": {"김용현": "곽종근에게 10~20분 뒤 상황발표 및 특전사 출동 대기 전화 지시", "곽종근": "김용현으로부터 출동 대기 지시 수령"}}, {"time": "2024.12.3 21:49", "phase": "dday", "actions": {"김용현": "조지호·김봉식에게 계엄 선포가 조금 늦어진다 연락", "조지호": "김용현으로부터 계엄 선포 지연 연락 수령", "김봉식": "김용현으로부터 계엄 선포 지연 연락 수령"}}, {"time": "2024.12.3 21:51", "phase": "dday", "actions": {"문상호": "고동희에게 선관위 진입 지연 대기 명령", "기타": "조성현 제1경비단장 비상소집 / 수방사 수호신 비상소집 지시"}}, {"time": "2024.12.3 21:52~21:56", "phase": "dday", "actions": {"기타": "수방사 2특임대대·35특임대대 소집"}}, {"time": "2024.12.3 21:57~22:16", "phase": "dday", "actions": {"기타": "추가 소집된 국무위원들 도착, 국무회의 정족수 11명 충족"}}, {"time": "2024.12.3 22:11:49~22:13:52", "phase": "dday", "actions": {"김용현": "(CCTV) 참석자들에게 검지로 숫자 1 표시"}}, {"time": "2024.12.3 22:16~22:18", "phase": "dday", "actions": {"윤석열": "비상계엄 일방적 선포 통보", "김용현": "비상계엄 선포문 사본 참석자들에게 배포"}}, {"time": "2024.12.3 22:20~22:27", "phase": "dday", "actions": {"곽종근": "예하 부대장들(김세운·김현태·이상현·안무성·김정근)에게 출동 지시 전파"}}, {"time": "2024.12.3 22:21", "phase": "dday", "actions": {"곽종근": "이상현에게 출동 준비 지시"}}, {"time": "2024.12.3 22:23~22:27", "phase": "dday", "actions": {"윤석열": "★ 1층 브리핑룸에서 비상계엄 선포 대국민 담화 생방송 발표 (22:27 전국 선포) ★"}}, {"time": "2024.12.3 22:24", "phase": "dday", "actions": {"곽종근": "제3공수 1개 대대 과천 선관위 출동 명령"}}, {"time": "2024.12.3 22:25", "phase": "dday", "actions": {"곽종근": "이상현에게 사복 편의대 국회·민주당사 급파 지시", "김봉식": "경찰 기동대 무전 지시"}}, {"time": "2024.12.3 22:27", "phase": "dday", "actions": {"김용현": "여인형에게 이재명 등 주요인사 체포 지시", "여인형": "김용현으로부터 주요인사 체포 지시 수령", "문상호": "요원들에게 임무 하달"}}, {"time": "2024.12.3 22:30", "phase": "dday", "actions": {"곽종근": "김세운에게 헬기 특전사령부 출동 지시", "이진우": "김봉식에게 군 출동 알림", "김봉식": "이진우로부터 군 출동 통보 받고 국회 통제 확인", "문상호": "고동희 등 선발대 10명 중앙선관위 진입, 당직자 휴대전화 압수"}}, {"time": "2024.12.3 22:31", "phase": "dday", "actions": {"윤석열": "대접견실로 복귀", "곽종근": "707특수임무단장 김현태에게 헬기 탑승 및 국회 본관 확보 지시"}}, {"time": "2024.12.3 22:33", "phase": "dday", "actions": {"곽종근": "1공수여단 국회 출동 재촉"}}, {"time": "2024.12.3 22:40", "phase": "dday", "actions": {"윤석열": "남은 국무위원에게 예산 차단 등 사후조치 문건 하달"}}, {"time": "2024.12.3 22:45", "phase": "dday", "actions": {"조지호": "김봉식으로부터 6개 기동대 국회 출입문 배치 보고 수령", "김봉식": "조지호에게 6개 기동대 국회 출입문 배치 보고"}}, {"time": "2024.12.3 22:46", "phase": "dday", "actions": {"김봉식": "국회 전면 차단 지시"}}, {"time": "2024.12.3 22:47~22:50", "phase": "dday", "actions": {"기타": "경찰 무전망 지시로 국회 외곽 차벽 설치 등 1차 봉쇄 완료"}}, {"time": "2024.12.3 22:53", "phase": "dday", "actions": {"윤석열": "홍장원(국정원)에게 '싹 다 잡아들이라' 지시", "기타": "제1공수 편의대 민주당사 출발"}}, {"time": "2024.12.3 23:00", "phase": "dday", "actions": {"기타": "제1공수 소속 편의대원 4명 국회 출동"}}, {"time": "2024.12.3 23:02", "phase": "dday", "actions": {"기타": "수방사 군사경찰단 출동 명령"}}, {"time": "2024.12.3 23:04~23:15", "phase": "dday", "actions": {"기타": "헬기 12대, 육군특수전사령부로 출동 완료"}}, {"time": "2024.12.3 23:09~익일 02:00", "phase": "dday", "actions": {"기타": "경찰 기동대, 과천 중앙선관위 출입 통제 및 봉쇄"}}, {"time": "2024.12.3 23:15~익일 00:48", "phase": "dday", "actions": {"윤석열": "조지호에게 최소 6차례 전화해 '의원들 다 체포하라' 지속 지시", "조지호": "윤석열로부터 6차례 의원 체포 지시 수령"}}, {"time": "2024.12.3 23:17~익일 02:11", "phase": "dday", "actions": {"기타": "수원 선거연수원 경찰 봉쇄"}}, {"time": "2024.12.3 23:22~23:43", "phase": "dday", "actions": {"기타": "707특수임무단 96명, 실탄 지참 헬기 12대 탑승 국회 출발"}}, {"time": "2024.12.3 23:23", "phase": "dday", "actions": {"박안수": "★ 계엄사령부 포고령(제1호) 발령 ★"}}, {"time": "2024.12.3 23:30~익일 01:00", "phase": "dday", "actions": {"김봉식": "군 병력 국회 진입하도록 무전망 통해 출입 부분 허용 (시민과 군 구별)"}}, {"time": "2024.12.3 23:30", "phase": "dday", "actions": {"기타": "707특임단 헬기, 비행승인 지연으로 용인 상공 대기"}}, {"time": "2024.12.3 23:31", "phase": "dday", "actions": {"곽종근": "이진우에게 헬기 서울 진입 승인 요청", "이진우": "곽종근의 헬기 서울 진입 승인 요청 받음", "기타": "민주당사 편의대 5명 도착"}}, {"time": "2024.12.3 23:33", "phase": "dday", "actions": {"박안수": "특전사 헬기의 서울 상공 진입 승인"}}, {"time": "2024.12.3 23:36", "phase": "dday", "actions": {"윤석열": "곽종근에게 헬기 이동 상황 묻고 부대 출동 독촉", "곽종근": "윤석열로부터 부대 출동 독촉 받음"}}, {"time": "2024.12.3 23:41~23:43", "phase": "dday", "actions": {"조지호": "오부명의 국회 출입 차단 해제 요청 묵살"}}, {"time": "2024.12.3 23:44", "phase": "dday", "actions": {"기타": "제1경비단 본부 29명 버스 편으로 국회 출발"}}, {"time": "2024.12.3 23:47~23:56", "phase": "dday", "actions": {"기타": "제3공수 138명 과천 선관위로 출발"}}, {"time": "2024.12.3 23:49~익일 00:11", "phase": "dday", "actions": {"기타": "헬기 12대, 국회의사당 후면 운동장 착륙 (707특임단 경내 진입)"}}, {"time": "2024.12.3 23:50", "phase": "dday", "actions": {"기타": "707특임단, 국회 정문 기자 휴대전화 강취·케이블타이 포박 시도 후 영상 삭제"}}, {"time": "2024.12.3 23:54", "phase": "dday", "actions": {"김봉식": "서울청 무전망 통해 포고령 근거 의원·보좌관 출입 전면 통제 재차 하달"}}, {"time": "2024.12.3 23:57", "phase": "dday", "actions": {"기타": "제1공수특전여단 제1대대 병력 136명 국회 출발"}}, {"time": "2024.12.3 23:59", "phase": "dday", "actions": {"기타": "707특임단, 국회의사당 정문 진입 시도하나 수백 명 시민·보좌진 저항에 막혀 30분간 대치"}}, {"time": "2024.12.4 00:08", "phase": "release", "actions": {"기타": "군사경찰단 후속부대 62명 국회 출발"}}, {"time": "2024.12.4 00:09", "phase": "release", "actions": {"기타": "김영호 국회경비대장, 군 병력 진입 돕기 위해 3·4문 쪽으로 병력 이동"}}, {"time": "2024.12.4 00:22", "phase": "release", "actions": {"이진우": "이상현에게 '담을 넘어 진입하라' 지시", "기타": "제1공수여단장 이상현 국회 인근 도착"}}, {"time": "2024.12.4 00:25~01:05", "phase": "release", "actions": {"기타": "방첩사 수사관 49명 순차적으로 국회 인근 도착하나 시민 저항으로 진입 실패"}}, {"time": "2024.12.4 00:30", "phase": "release", "actions": {"기타": "이상현, 제1대대장에게 담 넘어 본관 진입·의원 끌어내라 지시"}}, {"time": "2024.12.4 00:31", "phase": "release", "actions": {"윤석열": "★ 곽종근에게 직접 '빨리 문 부수고 들어가 끄집어내라' 지시 ★", "곽종근": "윤석열로부터 강제 진입·체포 직접 지시 받음"}}, {"time": "2024.12.4 00:32~00:58", "phase": "release", "actions": {"곽종근": "707단장 등에게 공포탄·테이저건 사용 및 전기 차단 등 강경 제압 지시"}}, {"time": "2024.12.4 00:34~00:46", "phase": "release", "actions": {"곽종근": "이상현에게 '도끼로 부수고 들어가라', '유리창 깨라' 지시"}}, {"time": "2024.12.4 00:39", "phase": "release", "actions": {"기타": "군사경찰단 후속부대 KBS 앞 도착"}}, {"time": "2024.12.4 00:40~01:08", "phase": "release", "actions": {"기타": "제3공수 병력(138명) 과천 선관위 도착"}}, {"time": "2024.12.4 00:47", "phase": "release", "actions": {"기타": "제1공수 제2대대 병력 담 넘어 경내 진입"}}, {"time": "2024.12.4 00:49", "phase": "release", "actions": {"기타": "★ 국회 본회의(비상계엄 해제 의결) 개회 ★"}}, {"time": "2024.12.4 00:50", "phase": "release", "actions": {"기타": "수방사 100여명 국회 3문 진입 / 제9공수 15명, 서대문 여론조사꽃 사무실 점거"}}, {"time": "2024.12.4 00:55~01:05", "phase": "release", "actions": {"기타": "제1공수 대원 38명, 본관 후면 유리문 강제 파손·침투, 당직자들과 무력 충돌"}}, {"time": "2024.12.4 01:01", "phase": "release", "actions": {"기타": "국회 본회의, 비상계엄 해제요구안 상정"}}, {"time": "2024.12.4 01:03", "phase": "release", "actions": {"기타": "★ 재석 국회의원 190명 만장일치로 '비상계엄 해제요구 결의안' 가결 ★"}}, {"time": "2024.12.4 01:09", "phase": "release", "actions": {"기타": "제9공수, 여론조사꽃에서 철수"}}, {"time": "2024.12.4 01:16~01:47", "phase": "release", "actions": {"윤석열": "합참 지하 결심지원실에 머무르며 김용현 등과 회의 계속", "김용현": "합참 지하 결심지원실에서 윤석열과 회의 계속"}}, {"time": "2024.12.4 01:20", "phase": "release", "actions": {"기타": "선관위 로비 점거 중이던 제3공수 인원 철수 시작"}}, {"time": "2024.12.4 01:45", "phase": "release", "actions": {"기타": "경찰 국회 전면 차단 해제 및 기동대 철수 시작 / 방첩사 49명 부대 복귀 명령"}}, {"time": "2024.12.4 01:46", "phase": "release", "actions": {"기타": "수방사 중위 등 5명 삼단봉 무장 후 국회 7문 담 넘어 진입"}}, {"time": "2024.12.4 02:13", "phase": "release", "actions": {"김용현": "곽종근에게 선관위 병력 재투입 타진 후 불가 답변에 '수고했다' 무마 발언", "곽종근": "김용현의 선관위 재투입 타진에 불가 답변"}}, {"time": "2024.12.4 03:40", "phase": "release", "actions": {"한덕수": "집무실에서 나와 계엄 해제 국무회의 소집 주도"}}, {"time": "2024.12.4 04:26", "phase": "release", "actions": {"윤석열": "★ 대국민 담화 통해 비상계엄 해제 공식 발표 ★"}}, {"time": "2024.12.4 04:27~04:29", "phase": "release", "actions": {"한덕수": "주재 국무회의에서 참석자 전원 동의로 비상계엄 해제안 공식 의결"}}, {"time": "2024.12.4 04:32", "phase": "release", "actions": {"기타": "국방부, 전 계엄 투입 병력의 원소속 부대 복귀 완료 발표"}}, {"time": "2024.12.4 05:30", "phase": "release", "actions": {"문상호": "100여단에서 선관위 투입 대기 36명 요원에게 복귀·보안 유지 명령"}}, {"time": "2024.12.5 오후", "phase": "after", "actions": {"강의구": "민정수석으로부터 '계엄 선포 뒷받침 국무위원 부서 문서 없음' 듣고 문서 위조 결심"}}, {"time": "2024.12.6 09:38", "phase": "after", "actions": {"강의구": "한덕수에게 연락해 '비상계엄 선포문' 1장 입수 / 서명란 표지 위조 합철", "한덕수": "강의구에게 보관 중이던 비상계엄 선포문 1장 전달"}}, {"time": "2024.12.6 20:36 이후", "phase": "after", "actions": {"강의구": "한덕수·김용현에게 허위 서명 받기 위해 직원 파견", "한덕수": "삼청동 총리 공관에서 허위 서명", "김용현": "한남동 국방장관 공관에서 허위 서명"}}, {"time": "2024.12.7 오전", "phase": "after", "actions": {"윤석열": "강의구의 보고 받고 본인 서명란에 최종 서명 → '가짜 비상계엄 선포문' 완성", "강의구": "윤석열에게 위조 서명 문서 보고", "기타": "윤석열 탄핵소추안 투표 불성립으로 1차 폐기"}}, {"time": "2024.12.8 07:22", "phase": "after", "actions": {"김용현": "★ 12.3 내란 사건으로 긴급체포 ★"}}, {"time": "2024.12.8", "phase": "after", "actions": {"한덕수": "강의구에게 전화해 '내가 서명한 것을 없었던 것으로 하자'며 허위 공문서 폐기 요청", "강의구": "한덕수로부터 위조 문서 폐기 요청 받음"}}, {"time": "2024.12.10", "phase": "after", "actions": {"윤석열": "관저에서 강의구로부터 한덕수 요청 보고 받고 문서 폐기 최종 승인", "강의구": "윤석열 승인 받고 대통령실 세단기로 위조 선포문 파쇄", "한덕수": "위조 문서 폐기 요청 (간접)"}}, {"time": "2024.12.14", "phase": "after", "actions": {"윤석열": "★ 국회 본회의에서 탄핵소추안 최종 의결되어 직무 권한 정지 ★"}}]};
+const PHASES = [{"key": "pre", "label": "사전 모의\n(3~11월)", "color": "#fef3c7", "border": "#f59e0b"}, {"key": "imminent", "label": "임박 단계\n(12.1~12.2)", "color": "#fed7aa", "border": "#ea580c"}, {"key": "dday", "label": "계엄 선포일\n(12.3)", "color": "#fecaca", "border": "#dc2626"}, {"key": "release", "label": "계엄 해제일\n(12.4)", "color": "#bbf7d0", "border": "#16a34a"}, {"key": "after", "label": "사후 (문서위조·탄핵)\n(12.5~12.14)", "color": "#bfdbfe", "border": "#2563eb"}];
+
+const state = {
+  query: "",
+  activePhases: new Set(PHASES.map(p => p.key)),
+  activePersons: new Set(DATA.persons.map(p => p.key)),
+  focusPerson: null,
+};
+
+const $ = sel => document.querySelector(sel);
+
+function renderPhaseChips() {
+  const wrap = $("#phaseChips");
+  wrap.innerHTML = "";
+  PHASES.forEach(ph => {
+    const chip = document.createElement("span");
+    chip.className = "chip" + (state.activePhases.has(ph.key) ? " active" : "");
+    chip.style.borderColor = ph.border;
+    if (state.activePhases.has(ph.key)) {
+      chip.style.background = ph.border;
+      chip.style.color = "#fff";
+    } else {
+      chip.style.color = ph.border;
+    }
+    chip.innerHTML = `<span class="dot" style="background:${ph.border}"></span>${ph.label.replace(/\n/g," ")}`;
+    chip.onclick = () => {
+      if (state.activePhases.has(ph.key)) state.activePhases.delete(ph.key);
+      else state.activePhases.add(ph.key);
+      renderPhaseChips(); applyFilters();
+    };
+    wrap.appendChild(chip);
+  });
+}
+
+function renderPhaseJump() {
+  const wrap = $("#phaseJump");
+  wrap.innerHTML = "";
+  PHASES.forEach(ph => {
+    const btn = document.createElement("button");
+    btn.textContent = "▶ " + ph.label.split("\n")[0];
+    btn.title = "이 단계의 첫 행으로 이동";
+    btn.onclick = () => {
+      const target = document.querySelector(`tr[data-phase='${ph.key}']:not(.row-hidden)`);
+      if (target) {
+        target.scrollIntoView({behavior:"smooth", block:"start"});
+        target.style.transition = "background 1.5s";
+        target.querySelectorAll("td").forEach(td => {
+          td.style.background = "#fef08a";
+          setTimeout(() => { td.style.background = ""; }, 1200);
+        });
+      }
+    };
+    wrap.appendChild(btn);
+  });
+}
+
+function renderPersonChips() {
+  const wrap = $("#personRow");
+  wrap.innerHTML = "";
+  const label = document.createElement("span");
+  label.style.cssText = "font-size:11px;color:#475569;font-weight:700;align-self:center;margin-right:6px;";
+  label.textContent = "인물 필터:";
+  wrap.appendChild(label);
+  DATA.persons.forEach(p => {
+    const chip = document.createElement("span");
+    const active = state.activePersons.has(p.key);
+    chip.className = "chip" + (active ? " active" : "");
+    chip.style.borderColor = p.color;
+    if (active) {
+      chip.style.background = p.color;
+      chip.style.color = "#fff";
+    } else {
+      chip.style.color = p.color;
+    }
+    chip.innerHTML = `<span class="dot" style="background:${p.color}"></span>${p.label}`;
+    chip.onclick = () => {
+      if (state.activePersons.has(p.key)) state.activePersons.delete(p.key);
+      else state.activePersons.add(p.key);
+      renderPersonChips(); renderTable();
+    };
+    wrap.appendChild(chip);
+  });
+  // 전체/해제
+  const all = document.createElement("span");
+  all.className = "chip";
+  all.style.cssText = "border-color:#0f172a;color:#0f172a;margin-left:auto;";
+  all.textContent = "전체 선택";
+  all.onclick = () => { DATA.persons.forEach(p => state.activePersons.add(p.key)); renderPersonChips(); renderTable(); };
+  wrap.appendChild(all);
+  const none = document.createElement("span");
+  none.className = "chip";
+  none.style.cssText = "border-color:#64748b;color:#64748b;";
+  none.textContent = "모두 해제";
+  none.onclick = () => { state.activePersons.clear(); renderPersonChips(); renderTable(); };
+  wrap.appendChild(none);
+}
+
+function renderTable() {
+  // header
+  const thead = $("#theadRow");
+  thead.innerHTML = "";
+  const thTime = document.createElement("th");
+  thTime.className = "time-col";
+  thTime.textContent = "시간";
+  thead.appendChild(thTime);
+  DATA.persons.forEach(p => {
+    const th = document.createElement("th");
+    th.style.borderTop = `4px solid ${p.color}`;
+    th.style.cursor = "pointer";
+    th.title = "클릭: 이 인물만 강조 · 다시 클릭하면 해제";
+    th.innerHTML = `${p.label}<span class="role">${p.role}</span>`;
+    th.dataset.person = p.key;
+    if (!state.activePersons.has(p.key)) th.classList.add("col-hidden");
+    if (state.focusPerson === p.key) th.style.background = "#fbbf24", th.style.color = "#422006";
+    th.onclick = () => {
+      state.focusPerson = state.focusPerson === p.key ? null : p.key;
+      renderTable();
+    };
+    thead.appendChild(th);
+  });
+
+  // body
+  const tbody = $("#tbody");
+  tbody.innerHTML = "";
+  const q = state.query.trim().toLowerCase();
+  let visibleCount = 0;
+
+  DATA.rows.forEach(row => {
+    const tr = document.createElement("tr");
+    tr.dataset.phase = row.phase;
+    tr.className = "phase-" + row.phase;
+
+    const showByPhase = state.activePhases.has(row.phase);
+    // 검색 매치: time 또는 활성 인물 중 어느 셀에라도 매치
+    let rowMatchesQ = !q;
+    if (q) {
+      if (row.time.toLowerCase().includes(q)) rowMatchesQ = true;
+      else {
+        for (const k of Object.keys(row.actions)) {
+          if (!state.activePersons.has(k)) continue;
+          if (String(row.actions[k]).toLowerCase().includes(q)) { rowMatchesQ = true; break; }
+        }
+      }
+    }
+    // 활성 인물에서 어떤 행위라도 있는 행만 표시
+    let hasAnyActiveAction = false;
+    for (const k of Object.keys(row.actions)) {
+      if (state.activePersons.has(k)) { hasAnyActiveAction = true; break; }
+    }
+
+    if (!showByPhase || !rowMatchesQ || !hasAnyActiveAction) tr.classList.add("row-hidden");
+    else visibleCount++;
+
+    const tdTime = document.createElement("td");
+    tdTime.className = "time-cell";
+    tdTime.textContent = row.time;
+    tr.appendChild(tdTime);
+
+    DATA.persons.forEach(p => {
+      const td = document.createElement("td");
+      td.dataset.person = p.key;
+      if (!state.activePersons.has(p.key)) td.classList.add("col-hidden");
+      const txt = row.actions[p.key];
+      if (txt) {
+        td.classList.add("has-action");
+        td.style.borderLeftColor = p.color;
+        let content = String(txt);
+        // ★ 강조
+        content = content.replace(/★/g, '<span class="star">★</span>');
+        // 검색어 하이라이트
+        if (q) {
+          const re = new RegExp("(" + q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "ig");
+          content = content.replace(re, '<mark class="q">$1</mark>');
+        }
+        td.innerHTML = content;
+        // focus 인물 강조
+        if (state.focusPerson) {
+          if (p.key === state.focusPerson) td.classList.add("highlight");
+          else td.classList.add("dim");
+        }
+        td.style.cursor = "pointer";
+        td.onclick = (e) => {
+          e.stopPropagation();
+          state.focusPerson = state.focusPerson === p.key ? null : p.key;
+          renderTable();
+        };
+      }
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+
+  // stats
+  $("#stats").innerHTML = `표시 행: <b>${visibleCount}</b> / ${DATA.rows.length} · 인물: <b>${state.activePersons.size}</b>/${DATA.persons.length}${state.focusPerson ? ` · 강조: <b>${state.focusPerson}</b>` : ""}`;
+  $("#emptyState").style.display = visibleCount === 0 ? "block" : "none";
+}
+
+function applyFilters() {
+  renderTable();
+}
+
+$("#searchBox").addEventListener("input", e => {
+  state.query = e.target.value;
+  renderTable();
+});
+
+$("#resetBtn").onclick = () => {
+  state.query = "";
+  state.activePhases = new Set(PHASES.map(p => p.key));
+  state.activePersons = new Set(DATA.persons.map(p => p.key));
+  state.focusPerson = null;
+  $("#searchBox").value = "";
+  renderPhaseChips(); renderPersonChips(); renderTable();
+};
+
+renderPhaseChips();
+renderPhaseJump();
+renderPersonChips();
+renderTable();
+</script>
+</body>
+</html>
